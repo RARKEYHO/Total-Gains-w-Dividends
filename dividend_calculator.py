@@ -1,7 +1,13 @@
-import yfinance as yf
+import streamlit as st
 import pandas as pd
 from datetime import datetime
-import streamlit as st
+
+# Try to import yfinance, install if not available
+try:
+    import yfinance as yf
+except ImportError:
+    st.error("yfinance not installed. Please check requirements.txt")
+    st.stop()
 
 # Initialize session state
 if 'results' not in st.session_state:
@@ -18,8 +24,9 @@ def calculate_metrics():
 
     try:
         # Fetch stock data
-        stock = yf.Ticker(ticker)
-        hist = stock.history(start=purchase_date)
+        with st.spinner(f"Fetching data for {ticker}..."):
+            stock = yf.Ticker(ticker)
+            hist = stock.history(start=purchase_date)
         
         if hist.empty:
             st.error("No data found for this ticker and date range")
@@ -48,8 +55,12 @@ def calculate_metrics():
                 
                 # Process initial period dividends
                 if additional_purchases:
-                    first_add_date = min(p['date'] for p in additional_purchases if p['date'])
-                    initial_dividends = dividends[dividends.index < first_add_date]
+                    valid_dates = [p['date'] for p in additional_purchases if p['date']]
+                    if valid_dates:
+                        first_add_date = min(valid_dates)
+                        initial_dividends = dividends[dividends.index < first_add_date]
+                    else:
+                        initial_dividends = dividends
                 else:
                     initial_dividends = dividends
                 
@@ -61,10 +72,8 @@ def calculate_metrics():
                         continue
                 
                 # Process additional purchase periods
-                sorted_purchases = sorted(
-                    [p for p in additional_purchases if p['date']], 
-                    key=lambda x: x['date']
-                )
+                valid_purchases = [p for p in additional_purchases if p['date']]
+                sorted_purchases = sorted(valid_purchases, key=lambda x: x['date'])
                 
                 for i, purchase in enumerate(sorted_purchases):
                     cumulative_shares += purchase['shares']
@@ -85,7 +94,7 @@ def calculate_metrics():
                 
                 total_shares += drip_shares
                 total_dividends = dividends.sum() * shares
-                for purchase in additional_purchases:
+                for purchase in valid_purchases:
                     if purchase['date']:
                         purchase_dividends = dividends[dividends.index >= purchase['date']].sum()
                         total_dividends += purchase_dividends * purchase['shares']
@@ -129,7 +138,7 @@ st.title("📈 Dividend & Total Gain/Loss Calculator")
 with st.sidebar:
     st.header("Investment Details")
     ticker = st.text_input("Ticker Symbol", value="AAPL", key="ticker")
-    purchase_date = st.date_input("Purchase Date", key="purchase_date")
+    purchase_date = st.date_input("Purchase Date", value=datetime(2020, 1, 1), key="purchase_date")
     shares = st.number_input("Number of Shares", min_value=0.0, value=10.0, key="shares")
     cost_basis = st.number_input("Cost Basis per Share ($)", min_value=0.0, value=100.0, key="cost_basis")
     drip = st.checkbox("Dividends Reinvested (DRIP)", value=True, key="drip")
@@ -181,14 +190,14 @@ with col1:
 
 with col2:
     if st.session_state.results:
-        if st.download_button(
+        csv = pd.DataFrame([st.session_state.results]).to_csv(index=False)
+        st.download_button(
             label="Download Results (CSV)",
-            data=pd.DataFrame([st.session_state.results]).to_csv(index=False),
+            data=csv,
             file_name=f"{st.session_state.results['Ticker']}_investment_summary.csv",
             mime="text/csv",
             use_container_width=True
-        ):
-            st.success("Results downloaded!")
+        )
 
 # Display results
 if st.session_state.results:
@@ -214,7 +223,6 @@ if st.session_state.results:
         st.metric("Total Dividends", f"${st.session_state.results['Total Dividends']:,.2f}")
     
     with col3:
-        color = "green" if st.session_state.results['Total Gain/Loss'] >= 0 else "red"
         st.metric(
             "Total Gain/Loss", 
             f"${st.session_state.results['Total Gain/Loss']:,.2f}",
