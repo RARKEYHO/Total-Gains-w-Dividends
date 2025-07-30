@@ -18,6 +18,8 @@ if 'calculated' not in st.session_state:
     st.session_state.calculated = False
 if 'results' not in st.session_state:
     st.session_state.results = None
+if 'dividend_details' not in st.session_state:
+    st.session_state.dividend_details = None
 
 # Sidebar for inputs
 with st.sidebar:
@@ -118,6 +120,16 @@ with col2:
                         # Filter dividends to purchase date range
                         dividends = dividends[dividends.index.date >= purchase_date]
                         
+                        # Store dividend details for export
+                        dividend_details = []
+                        if not dividends.empty:
+                            for date_idx, div_amount in dividends.items():
+                                dividend_details.append({
+                                    'Date': date_idx.strftime('%Y-%m-%d'),
+                                    'Dividend Per Share': div_amount,
+                                    'Shares at Time': 0  # Will be calculated below
+                                })
+                        
                         if drip and not dividends.empty:
                             # Simulate DRIP effect with improved accuracy
                             drip_shares = 0
@@ -133,6 +145,12 @@ with col2:
                                     initial_dividends = dividends
                             else:
                                 initial_dividends = dividends
+                            
+                            # Update dividend details with share counts
+                            for i, (date_idx, div_amount) in enumerate(dividends.items()):
+                                if date_idx in initial_dividends.index:
+                                    if i < len(dividend_details):
+                                        dividend_details[i]['Shares at Time'] = cumulative_shares
                             
                             # Calculate DRIP for initial period
                             for date_idx, div in initial_dividends.items():
@@ -167,6 +185,13 @@ with col2:
                                             (dividends.index.date >= purchase['date']) & 
                                             (dividends.index.date < sorted_purchases[i+1]['date'])
                                         ]
+                                    
+                                    # Update dividend details with share counts for this period
+                                    for date_idx, div_amount in period_dividends.items():
+                                        # Find the index in the original dividends series
+                                        original_idx = dividends.index.get_loc(date_idx)
+                                        if original_idx < len(dividend_details):
+                                            dividend_details[original_idx]['Shares at Time'] = cumulative_shares
                                     
                                     # Calculate DRIP for this period
                                     for date_idx, div in period_dividends.items():
@@ -213,11 +238,19 @@ with col2:
                             drip_shares = 0
                             # For non-DRIP, calculate based on total shares held
                             total_dividends = dividends.sum() * total_shares if not dividends.empty else 0
+                            
+                            # Update dividend details with final share count
+                            for detail in dividend_details:
+                                detail['Shares at Time'] = total_shares
+                        
+                        # Store dividend details in session state
+                        st.session_state.dividend_details = dividend_details
                         
                     except Exception as e:
                         st.warning(f"Could not fetch dividend data: {str(e)}")
                         total_dividends = 0
                         drip_shares = 0
+                        st.session_state.dividend_details = []
 
                     # Calculate current value
                     current_value = total_shares * current_price
@@ -229,6 +262,7 @@ with col2:
                     # Store results
                     st.session_state.results = {
                         'Ticker': ticker,
+                        'Initial Purchase Date': purchase_date.strftime('%Y-%m-%d'),
                         'Initial Shares': shares,
                         'Additional Shares': sum(p['shares'] for p in additional_purchases if p['shares']),
                         'DRIP Shares': round(drip_shares, 4),
@@ -258,12 +292,26 @@ with col2:
         st.markdown("---")
         st.subheader("Export Results")
         
-        # Download button
-        csv = pd.DataFrame([st.session_state.results]).to_csv(index=False)
+        # Create comprehensive export data
+        # Main results
+        main_df = pd.DataFrame([st.session_state.results])
+        
+        # Dividend details
+        if st.session_state.dividend_details:
+            dividend_df = pd.DataFrame(st.session_state.dividend_details)
+        else:
+            dividend_df = pd.DataFrame(columns=['Date', 'Dividend Per Share', 'Shares at Time'])
+        
+        # Combine into one CSV
+        csv_string = "INVESTMENT SUMMARY\n"
+        csv_string += main_df.to_csv(index=False) + "\n"
+        csv_string += "DIVIDEND DETAILS\n"
+        csv_string += dividend_df.to_csv(index=False)
+        
         st.download_button(
-            label="Download CSV",
-            data=csv,
-            file_name=f"{st.session_state.results['Ticker']}_investment_summary.csv",
+            label="Download Comprehensive CSV",
+            data=csv_string,
+            file_name=f"{st.session_state.results['Ticker']}_investment_report.csv",
             mime="text/csv",
             use_container_width=True
         )
@@ -323,6 +371,18 @@ if st.session_state.calculated and st.session_state.results:
     
     with share_col4:
         st.metric("Total Shares", st.session_state.results['Total Shares'])
+    
+    # Dividend details table
+    if st.session_state.dividend_details:
+        st.subheader("Dividend History")
+        dividend_df = pd.DataFrame(st.session_state.dividend_details)
+        st.dataframe(dividend_df.style.format({
+            'Dividend Per Share': '${:,.4f}',
+            'Shares at Time': '{:,.4f}'
+        }), use_container_width=True)
+    else:
+        st.subheader("Dividend History")
+        st.info("No dividend data available for this ticker")
 
 # Instructions
 with st.expander("How to Use This Calculator", expanded=True):
@@ -330,10 +390,11 @@ with st.expander("How to Use This Calculator", expanded=True):
     1. Enter your investment details in the sidebar
     2. Add any additional purchases if applicable
     3. Click "Calculate Investment Performance"
-    4. View results and download CSV for spreadsheet use
+    4. View results and download comprehensive CSV report
     
     **Note:** 
     - Date range extended to Jan 1, 1970
     - Dividend data depends on Yahoo Finance availability
     - DRIP calculations approximate reinvestment value
+    - Export includes both summary and detailed dividend information
     """)
