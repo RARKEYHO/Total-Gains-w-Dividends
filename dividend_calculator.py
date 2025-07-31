@@ -343,3 +343,24 @@ with st.expander("How to Use This Calculator", expanded=True):
     - DRIP calculations now properly compound with increasing dividends
     - Export includes both summary and detailed dividend information
     """)
+
+# Footer
+st.markdown("---")
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    st.markdown("""
+    <div style="text-align: center;">
+        <p>If you found this helpful, you can buy me a coffee 🙂</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Center the button
+    button_col1, button_col2, button_col3 = st.columns([1, 2, 1])
+    with button_col2:
+        st.link_button("☕ Buy me a coffee", "https://paypal.me/nidwannaya", use_container_width=True)
+    
+    st.markdown("""
+    <div style="text-align: center; margin-top: 20px;">
+        <p>© 2025 Rajesh Nidwannaya. All rights reserved. ~ raj@nidwannaya.com ~ www.nidwannaya.com</p>
+    </div>
+    """, unsafe_allow_html=True)
