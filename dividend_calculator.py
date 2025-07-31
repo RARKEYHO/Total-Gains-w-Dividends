@@ -127,7 +127,8 @@ with col2:
                                 dividend_details.append({
                                     'Date': date_idx.strftime('%Y-%m-%d'),
                                     'Dividend Per Share': div_amount,
-                                    'Shares at Time': 0
+                                    'Shares at Time': 0,
+                                    'Total Dividends': 0  # Will be calculated below
                                 })
                         
                         if drip and not dividends.empty:
@@ -151,6 +152,8 @@ with col2:
                                 if date_idx in initial_dividends.index:
                                     if i < len(dividend_details):
                                         dividend_details[i]['Shares at Time'] = cumulative_shares
+                                        # Calculate total dividends for this payment
+                                        dividend_details[i]['Total Dividends'] = div_amount * cumulative_shares
                             
                             # Calculate DRIP for initial period
                             for date_idx, div in initial_dividends.items():
@@ -189,6 +192,8 @@ with col2:
                                         original_idx = dividends.index.get_loc(date_idx)
                                         if original_idx < len(dividend_details):
                                             dividend_details[original_idx]['Shares at Time'] = cumulative_shares
+                                            # Calculate total dividends for this payment
+                                            dividend_details[original_idx]['Total Dividends'] = div_amount * cumulative_shares
                                     
                                     # Calculate DRIP for this period
                                     for date_idx, div in period_dividends.items():
@@ -233,9 +238,10 @@ with col2:
                             drip_shares = 0
                             total_dividends = dividends.sum() * total_shares if not dividends.empty else 0
                             
-                            # Update dividend details with final share count
+                            # Update dividend details with final share count and total dividends
                             for detail in dividend_details:
                                 detail['Shares at Time'] = total_shares
+                                detail['Total Dividends'] = detail['Dividend Per Share'] * total_shares
                         
                         # Store dividend details in session state
                         st.session_state.dividend_details = dividend_details
@@ -292,7 +298,7 @@ with col2:
         if st.session_state.dividend_details:
             dividend_df = pd.DataFrame(st.session_state.dividend_details)
         else:
-            dividend_df = pd.DataFrame(columns=['Date', 'Dividend Per Share', 'Shares at Time'])
+            dividend_df = pd.DataFrame(columns=['Date', 'Dividend Per Share', 'Shares at Time', 'Total Dividends'])
         
         # Combine into one CSV
         csv_string = "INVESTMENT SUMMARY\n"
@@ -370,7 +376,8 @@ if st.session_state.calculated and st.session_state.results:
         dividend_df = pd.DataFrame(st.session_state.dividend_details)
         st.dataframe(dividend_df.style.format({
             'Dividend Per Share': '${:,.4f}',
-            'Shares at Time': '{:,.4f}'
+            'Shares at Time': '{:,.4f}',
+            'Total Dividends': '${:,.4f}'
         }), use_container_width=True)
     else:
         st.subheader("Dividend History")
