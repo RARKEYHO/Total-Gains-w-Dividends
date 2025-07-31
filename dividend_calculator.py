@@ -10,6 +10,31 @@ st.set_page_config(
     layout="wide"
 )
 
+# Custom CSS for button colors
+st.markdown("""
+<style>
+    /* Green calculate button */
+    .stButton > button[kind="primary"] {
+        background-color: #28a745 !important;
+        border: 1px solid #28a745 !important;
+    }
+    
+    /* Blue download button */
+    .stDownloadButton > button {
+        background-color: #007bff !important;
+        border: 1px solid #007bff !important;
+        color: white !important;
+    }
+    
+    /* Success message styling */
+    div[data-testid="stAlert"] {
+        background-color: transparent !important;
+        border: 1px solid #28a745 !important;
+        border-radius: 5px !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # App title with subheading
 st.markdown("""
     <div style="text-align: center; margin-bottom: 10px;">
@@ -25,6 +50,10 @@ if 'results' not in st.session_state:
     st.session_state.results = None
 if 'dividend_details' not in st.session_state:
     st.session_state.dividend_details = None
+if 'dividends_count' not in st.session_state:
+    st.session_state.dividends_count = 0
+if 'purchase_date' not in st.session_state:
+    st.session_state.purchase_date = None
 
 # Sidebar for inputs
 with st.sidebar:
@@ -133,11 +162,6 @@ with col2:
                             cumulative_shares = total_shares
                             total_dividends_received = 0
                             
-                            # Create a list of all significant dates (purchase dates + dividend dates)
-                            all_dates = [purchase_date] + [p['date'] for p in additional_purchases if p['date']]
-                            dividend_dates = list(dividends.index.date)
-                            all_significant_dates = sorted(set(all_dates + dividend_dates))
-                            
                             # Process each dividend payment chronologically
                             for date_idx, div_amount in dividends.items():
                                 dividend_date = date_idx.date()
@@ -196,12 +220,15 @@ with col2:
                         
                         # Store dividend details in session state
                         st.session_state.dividend_details = dividend_details
+                        st.session_state.dividends_count = len(dividends) if not dividends.empty else 0
+                        st.session_state.purchase_date = purchase_date
                         
                     except Exception as e:
                         st.warning(f"Could not fetch dividend data: {str(e)}")
                         total_dividends = 0
                         drip_shares = 0
                         st.session_state.dividend_details = []
+                        st.session_state.dividends_count = 0
 
                     # Calculate current value
                     current_value = total_shares * current_price
@@ -227,25 +254,37 @@ with col2:
                     }
                     
                     st.session_state.calculated = True
-                    st.success("Calculation complete!")
                     
-                    # Show info about dividend data
+                    # Show consolidated success message
                     if not dividends.empty:
-                        st.info(f"Found {len(dividends)} dividend payments since {purchase_date}")
+                        st.success(f"Calculation complete! Found {len(dividends)} dividend payments since {purchase_date}")
                     else:
-                        st.warning("No dividend data available for this stock/ticker")
+                        st.success("Calculation complete! No dividend data available for this stock/ticker")
                     
             except Exception as e:
                 st.error(f"Error: {str(e)}")
     
     # Display results if available
     if st.session_state.calculated and st.session_state.results:
-        # Download button (now blue and more visible)
+        # Download button (now blue)
         st.markdown("### Export Results")
-        csv = pd.DataFrame([st.session_state.results]).to_csv(index=False)
+        # Create comprehensive export data
+        main_df = pd.DataFrame([st.session_state.results])
+        
+        if st.session_state.dividend_details:
+            dividend_df = pd.DataFrame(st.session_state.dividend_details)
+        else:
+            dividend_df = pd.DataFrame(columns=['Date', 'Dividend Per Share', 'Shares at Time', 'Total Dividends'])
+        
+        # Combine into one CSV
+        csv_string = "INVESTMENT SUMMARY\n"
+        csv_string += main_df.to_csv(index=False) + "\n"
+        csv_string += "DIVIDEND DETAILS\n"
+        csv_string += dividend_df.to_csv(index=False)
+        
         st.download_button(
             label="📥 Download Comprehensive CSV",
-            data=csv,
+            data=csv_string,
             file_name=f"{st.session_state.results['Ticker']}_investment_report.csv",
             mime="text/csv",
             use_container_width=True,
