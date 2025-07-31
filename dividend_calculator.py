@@ -3,47 +3,6 @@ import pandas as pd
 from datetime import date
 import yfinance as yf
 
-# Force light theme
-st.markdown("""
-<style>
-    /* Ensure light background */
-    .stApp {
-        background-color: white;
-    }
-    
-    /* Light header */
-    header {
-        background-color: #f8f9fa !important;
-    }
-    
-    /* Light sidebar */
-    section[data-testid="stSidebar"] {
-        background-color: #ffffff;
-    }
-    
-    /* Light cards */
-    div[data-testid="stExpander"] {
-        background-color: white;
-        border: 1px solid #e9ecef;
-    }
-    
-    div[data-testid="stExpander"] div[role="button"] {
-        background-color: #f8f9fa;
-    }
-    
-    /* Light metric cards */
-    div[data-testid="metric-container"] {
-        background-color: #ffffff;
-        border: 1px solid #e9ecef;
-    }
-    
-    /* Light dataframe */
-    div[data-testid="stDataFrame"] {
-        border: 1px solid #e9ecef;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 # App configuration
 st.set_page_config(
     page_title="Dividend & Gain Calculator",
@@ -169,7 +128,7 @@ with col2:
                                     'Date': date_idx.strftime('%Y-%m-%d'),
                                     'Dividend Per Share': div_amount,
                                     'Shares at Time': 0,
-                                    'Total Dividends': 0
+                                    'Total Dividends': 0  # Will be calculated below
                                 })
                         
                         if drip and not dividends.empty:
@@ -188,11 +147,12 @@ with col2:
                             else:
                                 initial_dividends = dividends
                             
-                            # Update dividend details with share counts for initial period
+                            # Update dividend details with share counts
                             for i, (date_idx, div_amount) in enumerate(dividends.items()):
                                 if date_idx in initial_dividends.index:
                                     if i < len(dividend_details):
                                         dividend_details[i]['Shares at Time'] = cumulative_shares
+                                        # Calculate total dividends for this payment
                                         dividend_details[i]['Total Dividends'] = div_amount * cumulative_shares
                             
                             # Calculate DRIP for initial period
@@ -227,15 +187,13 @@ with col2:
                                             (dividends.index.date < sorted_purchases[i+1]['date'])
                                         ]
                                     
-                                    # Update dividend details with share counts for this period
+                                    # Update dividend details with share counts
                                     for date_idx, div_amount in period_dividends.items():
-                                        try:
-                                            original_idx = dividends.index.get_loc(date_idx)
-                                            if original_idx < len(dividend_details):
-                                                dividend_details[original_idx]['Shares at Time'] = cumulative_shares
-                                                dividend_details[original_idx]['Total Dividends'] = div_amount * cumulative_shares
-                                        except:
-                                            continue
+                                        original_idx = dividends.index.get_loc(date_idx)
+                                        if original_idx < len(dividend_details):
+                                            dividend_details[original_idx]['Shares at Time'] = cumulative_shares
+                                            # Calculate total dividends for this payment
+                                            dividend_details[original_idx]['Total Dividends'] = div_amount * cumulative_shares
                                     
                                     # Calculate DRIP for this period
                                     for date_idx, div in period_dividends.items():
@@ -254,7 +212,7 @@ with col2:
                                         except:
                                             continue
                             else:
-                                sorted_purchases = []
+                                sorted_purchases = []  # Define sorted_purchases even when empty
                             
                             total_shares += drip_shares
                             
@@ -291,7 +249,7 @@ with col2:
                         st.session_state.dividend_details = dividend_details
                         
                     except Exception as e:
-                        st.warning(f"Could not fetch dividend  {str(e)}")
+                        st.warning(f"Could not fetch dividend data: {str(e)}")
                         total_dividends = 0
                         drip_shares = 0
                         st.session_state.dividend_details = []
