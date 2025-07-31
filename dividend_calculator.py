@@ -10,8 +10,13 @@ st.set_page_config(
     layout="wide"
 )
 
-# App title
-st.title("💰 DiviGain Pro - Dividend & Gain/Loss Calculator")
+# App title with subheading
+st.markdown("""
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="margin-bottom: 0;">💰 DiviGain Pro</h1>
+        <h3 style="margin-top: 5px; font-weight: normal; color: #666;">Dividend & Gain/Loss Calculator</h3>
+    </div>
+""", unsafe_allow_html=True)
 
 # Initialize session state
 if 'calculated' not in st.session_state:
