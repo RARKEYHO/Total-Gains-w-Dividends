@@ -361,6 +361,7 @@ with col2:
     
     st.markdown("""
     <div style="text-align: center; margin-top: 20px;">
-        <p>© 2025 Rajesh Nidwannaya. All rights reserved. ~ raj@nidwannaya.com ~ www.nidwannaya.com</p>
+        <p>© 2025 Rajesh Nidwannaya. All rights reserved.</p>
+        <p>raj@nidwannaya.com ~ www.nidwannaya.com</p>
     </div>
     """, unsafe_allow_html=True)
