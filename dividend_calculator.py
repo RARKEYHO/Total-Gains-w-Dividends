@@ -122,128 +122,72 @@ with col2:
                         
                         # Store dividend details for export
                         dividend_details = []
-                        if not dividends.empty:
-                            for date_idx, div_amount in dividends.items():
-                                dividend_details.append({
-                                    'Date': date_idx.strftime('%Y-%m-%d'),
-                                    'Dividend Per Share': div_amount,
-                                    'Shares at Time': 0,
-                                    'Total Dividends': 0  # Will be calculated below
-                                })
                         
-                        if drip and not dividends.empty:
-                            # Simulate DRIP effect
-                            drip_shares = 0
-                            cumulative_shares = shares
+                        if not dividends.empty:
+                            # Initialize for DRIP calculations
+                            cumulative_shares = total_shares
+                            total_dividends_received = 0
                             
-                            # Process initial period dividends
-                            if additional_purchases:
-                                valid_dates = [p['date'] for p in additional_purchases if p['date']]
-                                if valid_dates:
-                                    first_add_date = min(valid_dates)
-                                    initial_dividends = dividends[dividends.index.date < first_add_date]
-                                else:
-                                    initial_dividends = dividends
-                            else:
-                                initial_dividends = dividends
+                            # Create a list of all significant dates (purchase dates + dividend dates)
+                            all_dates = [purchase_date] + [p['date'] for p in additional_purchases if p['date']]
+                            dividend_dates = list(dividends.index.date)
+                            all_significant_dates = sorted(set(all_dates + dividend_dates))
                             
-                            # Update dividend details with share counts
-                            for i, (date_idx, div_amount) in enumerate(dividends.items()):
-                                if date_idx in initial_dividends.index:
-                                    if i < len(dividend_details):
-                                        dividend_details[i]['Shares at Time'] = cumulative_shares
-                                        # Calculate total dividends for this payment
-                                        dividend_details[i]['Total Dividends'] = div_amount * cumulative_shares
-                            
-                            # Calculate DRIP for initial period
-                            for date_idx, div in initial_dividends.items():
-                                try:
-                                    price_date = date_idx.strftime('%Y-%m-%d')
-                                    if price_date in hist.index.strftime('%Y-%m-%d'):
-                                        price_at_div = hist.loc[price_date]['Close']
-                                    else:
-                                        hist_before = hist[hist.index <= date_idx]
-                                        if not hist_before.empty:
-                                            price_at_div = hist_before['Close'][-1]
-                                        else:
-                                            continue
-                                    
-                                    drip_shares += (cumulative_shares * div) / price_at_div
-                                except:
-                                    continue
-                            
-                            # Process additional purchase periods
-                            valid_purchases = [p for p in additional_purchases if p['date']]
-                            if valid_purchases:
-                                sorted_purchases = sorted(valid_purchases, key=lambda x: x['date'])
+                            # Process each dividend payment chronologically
+                            for date_idx, div_amount in dividends.items():
+                                dividend_date = date_idx.date()
                                 
-                                for i, purchase in enumerate(sorted_purchases):
-                                    cumulative_shares += purchase['shares']
-                                    if i == len(sorted_purchases) - 1:
-                                        period_dividends = dividends[dividends.index.date >= purchase['date']]
-                                    else:
-                                        period_dividends = dividends[
-                                            (dividends.index.date >= purchase['date']) & 
-                                            (dividends.index.date < sorted_purchases[i+1]['date'])
-                                        ]
-                                    
-                                    # Update dividend details with share counts
-                                    for date_idx, div_amount in period_dividends.items():
-                                        original_idx = dividends.index.get_loc(date_idx)
-                                        if original_idx < len(dividend_details):
-                                            dividend_details[original_idx]['Shares at Time'] = cumulative_shares
-                                            # Calculate total dividends for this payment
-                                            dividend_details[original_idx]['Total Dividends'] = div_amount * cumulative_shares
-                                    
-                                    # Calculate DRIP for this period
-                                    for date_idx, div in period_dividends.items():
-                                        try:
-                                            price_date = date_idx.strftime('%Y-%m-%d')
-                                            if price_date in hist.index.strftime('%Y-%m-%d'):
-                                                price_at_div = hist.loc[price_date]['Close']
+                                # Find share count at time of dividend
+                                shares_at_time = cumulative_shares
+                                
+                                # Calculate dividend received at this time
+                                dividend_received = shares_at_time * div_amount
+                                total_dividends_received += dividend_received
+                                
+                                # Add to dividend details
+                                dividend_details.append({
+                                    'Date': dividend_date.strftime('%Y-%m-%d'),
+                                    'Dividend Per Share': div_amount,
+                                    'Shares at Time': shares_at_time,
+                                    'Total Dividends': dividend_received
+                                })
+                                
+                                # If DRIP is enabled, reinvest the dividend
+                                if drip:
+                                    try:
+                                        price_date = dividend_date.strftime('%Y-%m-%d')
+                                        if price_date in hist.index.strftime('%Y-%m-%d'):
+                                            price_at_div = hist.loc[price_date]['Close']
+                                        else:
+                                            # Get the closest previous trading day
+                                            hist_before = hist[hist.index.date <= dividend_date]
+                                            if not hist_before.empty:
+                                                price_at_div = hist_before['Close'][-1]
                                             else:
-                                                hist_before = hist[hist.index <= date_idx]
-                                                if not hist_before.empty:
-                                                    price_at_div = hist_before['Close'][-1]
-                                                else:
-                                                    continue
-                                            
-                                            drip_shares += (cumulative_shares * div) / price_at_div
-                                        except:
-                                            continue
+                                                continue
+                                        
+                                        # Calculate new shares from reinvestment
+                                        new_shares = dividend_received / price_at_div
+                                        cumulative_shares += new_shares
+                                    except:
+                                        continue
+                            
+                            # Update total shares if DRIP was used
+                            if drip:
+                                total_shares = cumulative_shares
+                                total_dividends = total_dividends_received
                             else:
-                                sorted_purchases = []  # Define sorted_purchases even when empty
-                            
-                            total_shares += drip_shares
-                            
-                            # Calculate total dividends
-                            total_dividends = 0
-                            cumulative_shares_temp = shares
-                            
-                            # Dividends for initial period
-                            initial_div_value = initial_dividends.sum() * cumulative_shares_temp
-                            total_dividends += initial_div_value
-                            
-                            # Dividends for additional purchase periods
-                            for i, purchase in enumerate(sorted_purchases):
-                                cumulative_shares_temp += purchase['shares']
-                                if i == len(sorted_purchases) - 1:
-                                    period_divs = dividends[dividends.index.date >= purchase['date']]
-                                else:
-                                    period_divs = dividends[
-                                        (dividends.index.date >= purchase['date']) & 
-                                        (dividends.index.date < sorted_purchases[i+1]['date'])
-                                    ]
-                                period_div_value = period_divs.sum() * cumulative_shares_temp
-                                total_dividends += period_div_value
+                                # For non-DRIP, dividends based on final share count
+                                total_dividends = dividends.sum() * total_shares
                         else:
+                            # No dividends
+                            total_dividends = 0
                             drip_shares = 0
-                            total_dividends = dividends.sum() * total_shares if not dividends.empty else 0
-                            
-                            # Update dividend details with final share count and total dividends
-                            for detail in dividend_details:
-                                detail['Shares at Time'] = total_shares
-                                detail['Total Dividends'] = detail['Dividend Per Share'] * total_shares
+                        
+                        # Calculate DRIP shares (difference between final and initial shares)
+                        drip_shares = total_shares - (shares + sum(p['shares'] for p in additional_purchases if p['shares']))
+                        if drip_shares < 0:
+                            drip_shares = 0
                         
                         # Store dividend details in session state
                         st.session_state.dividend_details = dividend_details
@@ -396,6 +340,6 @@ with st.expander("How to Use This Calculator", expanded=True):
     **Note:** 
     - Date range extended to Jan 1, 1970
     - Dividend data depends on Yahoo Finance availability
-    - DRIP calculations approximate reinvestment value
+    - DRIP calculations now properly compound with increasing dividends
     - Export includes both summary and detailed dividend information
     """)
