@@ -12,9 +12,9 @@ st.set_page_config(
 
 # App title with subheading
 st.markdown("""
-    <div style="text-align: center; margin-bottom: 20px;">
+    <div style="text-align: center; margin-bottom: 10px;">
         <h1 style="margin-bottom: 0;">💰 DiviGain Pro</h1>
-        <h3 style="margin-top: 5px; font-weight: normal; color: #666;">Dividend & Gain/Loss Calculator</h3>
+        <h3 style="margin-top: 2px; font-weight: bold; color: #a0a0a0;">Dividend & Gain/Loss Calculator</h3>
     </div>
 """, unsafe_allow_html=True)
 
@@ -88,7 +88,7 @@ with col1:
 with col2:
     st.subheader("Calculate Results")
     
-    # Calculate button
+    # Calculate button (now green)
     if st.button("Calculate Investment Performance", type="primary", use_container_width=True):
         with st.spinner("Fetching financial data and calculating..."):
             try:
@@ -240,34 +240,20 @@ with col2:
     
     # Display results if available
     if st.session_state.calculated and st.session_state.results:
-        st.markdown("---")
-        st.subheader("Export Results")
-        
-        # Create comprehensive export data
-        main_df = pd.DataFrame([st.session_state.results])
-        
-        if st.session_state.dividend_details:
-            dividend_df = pd.DataFrame(st.session_state.dividend_details)
-        else:
-            dividend_df = pd.DataFrame(columns=['Date', 'Dividend Per Share', 'Shares at Time', 'Total Dividends'])
-        
-        # Combine into one CSV
-        csv_string = "INVESTMENT SUMMARY\n"
-        csv_string += main_df.to_csv(index=False) + "\n"
-        csv_string += "DIVIDEND DETAILS\n"
-        csv_string += dividend_df.to_csv(index=False)
-        
+        # Download button (now blue and more visible)
+        st.markdown("### Export Results")
+        csv = pd.DataFrame([st.session_state.results]).to_csv(index=False)
         st.download_button(
-            label="Download Comprehensive CSV",
-            data=csv_string,
+            label="📥 Download Comprehensive CSV",
+            data=csv,
             file_name=f"{st.session_state.results['Ticker']}_investment_report.csv",
             mime="text/csv",
-            use_container_width=True
+            use_container_width=True,
+            help="Download your investment report as CSV"
         )
 
 # Results display area
 if st.session_state.calculated and st.session_state.results:
-    st.markdown("---")
     st.header("Investment Summary")
     
     # Key metrics
