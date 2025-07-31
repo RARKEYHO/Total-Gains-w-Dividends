@@ -5,13 +5,13 @@ import yfinance as yf
 
 # App configuration
 st.set_page_config(
-    page_title="Dividend & Gain Calculator",
+    page_title="DiviGain Pro - Dividend & Gain Calculator",
     page_icon="💰",
     layout="wide"
 )
 
 # App title
-st.title("💰 Dividend & Gain/Loss Calculator")
+st.title("💰 DiviGain Pro - Dividend & Gain/Loss Calculator")
 
 # Initialize session state
 if 'calculated' not in st.session_state:
@@ -360,8 +360,8 @@ with col2:
         st.link_button("☕ Buy me a coffee", "https://paypal.me/nidwannaya", use_container_width=True)
     
     st.markdown("""
-    <div style="text-align: center; margin-top: 20px;">
-        <p>© 2025 Rajesh Nidwannaya. All rights reserved.</p>
-        <p>raj@nidwannaya.com ~ www.nidwannaya.com</p>
+    <div style="text-align: center; margin-top: 10px;">
+        <p>© 2025 Rajesh Nidwannaya. All rights reserved.<br>
+        <a href="mailto:raj@nidwannaya.com">raj@nidwannaya.com</a> ~ <a href="https://www.nidwannaya.com" target="_blank">www.nidwannaya.com</a></p>
     </div>
     """, unsafe_allow_html=True)
